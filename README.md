@@ -327,6 +327,48 @@ Layers 1–3 share the same JSON format:
 - Within each layer, rules are evaluated in declaration order — the first match wins.
 - If a rule file does not exist, it is silently skipped.
 
+### Path Filtering
+
+Rule files also support `include` and `exclude` fields to control which files enter the review scope:
+
+```json
+{
+  "rules": [
+    {"path": "**/*.java", "rule": "Check for null safety"}
+  ],
+  "include": ["src/main/**/*.java", "lib/**/*.kt"],
+  "exclude": ["**/generated/**", "vendor/**"]
+}
+```
+
+**Filter decision priority (highest to lowest):**
+
+| Step | Condition | Result |
+|------|-----------|--------|
+| 1 | File is binary | Excluded |
+| 2 | Path matches user `exclude` pattern | Excluded |
+| 3 | File extension not in supported list | Excluded |
+| 4 | `include` is configured and path matches | **Reviewed** (skips step 5) |
+| 5 | Path matches built-in default exclude pattern (test files, etc.) | Excluded |
+| 6 | None of the above | Reviewed |
+
+**How it works:**
+
+- `include` and `exclude` follow the same priority chain as review rules (`--rule` > project config > global config). The **highest-priority layer that has include/exclude configured** takes effect as a whole — patterns are not merged across layers.
+- `exclude` always wins over `include` — a file matching both is excluded.
+- `include` acts as a **bypass for built-in default exclude patterns** (e.g., test files), not as an exclusive allowlist — files not matching any `include` pattern still proceed through the default filter checks normally.
+- Pattern syntax: supports `**` recursive matching, `*` single-segment matching, and `{a,b}` brace expansion. Matching is case-insensitive.
+
+**Built-in default exclude patterns** (filters test files, etc. — can be overridden with `include`):
+
+```
+**/*_test.go, **/*Test.java, **/*Tests.java, **/*_test.rs,
+**/*.test.{js,jsx,ts,tsx}, **/*.spec.{js,jsx,ts,tsx}, **/__tests__/**,
+**/src/test/java/**/*.java, **/src/test/**/*.kt,
+**/test/**/*_test.py, **/tests/**/*_test.py, **/*_test.py,
+**/*_spec.rb, **/spec/**/*_spec.rb, **/oh_modules/**
+```
+
 ## Configuration Reference
 
 Config file: `~/.opencodereview/config.json`
