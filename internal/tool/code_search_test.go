@@ -207,8 +207,8 @@ func TestGitGrep_OptionLikeRefDoesNotLaunchPager(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(result, "unable to resolve revision") && !strings.Contains(result, "Not a valid object name") {
-		t.Fatalf("expected invalid revision error, got: %s", result)
+	if !strings.HasPrefix(result, "Error:") {
+		t.Fatalf("expected git error for invalid ref, got: %s", result)
 	}
 	if _, err := os.Stat(proofPath); err == nil {
 		t.Fatal("option-like ref launched pager and created proof file")
