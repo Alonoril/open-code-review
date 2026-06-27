@@ -3,9 +3,12 @@ package tool
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/open-code-review/open-code-review/internal/gitcmd"
 )
 
 // TestFileFind_NonGitDirectoryFallback verifies file_find works in a plain
@@ -62,5 +65,160 @@ func TestFileFind_NonGitDirectoryNoMatch(t *testing.T) {
 	}
 	if !strings.Contains(out, "not found") {
 		t.Errorf("expected not-found sentinel, got: %q", out)
+	}
+}
+
+func TestFileFindProvider_Tool(t *testing.T) {
+	p := NewFileFind(&FileReader{RepoDir: "/tmp"})
+	if p.Tool() != FileFind {
+		t.Errorf("Tool() = %v, want FileFind", p.Tool())
+	}
+}
+
+func TestFileFind_BlankQuery(t *testing.T) {
+	p := NewFileFind(&FileReader{RepoDir: "/tmp"})
+	got, err := p.Execute(context.Background(), map[string]any{"query_name": "  "})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(got, "not found") {
+		t.Errorf("expected not-found for blank query, got: %q", got)
+	}
+}
+
+func setupFileFindRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("setup %v: %v\n%s", args, err, out)
+		}
+	}
+	run("git", "init")
+	run("git", "config", "user.email", "test@test.com")
+	run("git", "config", "user.name", "Test")
+
+	write := func(rel, content string) {
+		full := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("main.go", "package main\n")
+	write("pkg/util.go", "package pkg\n")
+	write("Makefile", "all:\n")
+	write("Dockerfile", "FROM scratch\n")
+	write("LICENSE", "MIT\n")
+	write("data_binary", "binary\n")
+
+	run("git", "add", ".")
+	run("git", "commit", "-m", "init")
+	return dir
+}
+
+func TestFileFind_GitRepo_WorkspaceMode(t *testing.T) {
+	dir := setupFileFindRepo(t)
+	p := NewFileFind(&FileReader{RepoDir: dir, Mode: ModeWorkspace})
+
+	got, err := p.Execute(context.Background(), map[string]any{"query_name": ".go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "main.go") || !strings.Contains(got, "util.go") {
+		t.Errorf("expected .go files, got: %s", got)
+	}
+}
+
+func TestFileFind_GitRepo_CommitMode(t *testing.T) {
+	dir := setupFileFindRepo(t)
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit := strings.TrimSpace(string(out))
+
+	p := NewFileFind(&FileReader{RepoDir: dir, Mode: ModeCommit, Ref: commit})
+
+	got, execErr := p.Execute(context.Background(), map[string]any{"query_name": ".go"})
+	if execErr != nil {
+		t.Fatal(execErr)
+	}
+	if !strings.Contains(got, "main.go") {
+		t.Errorf("expected main.go in commit mode, got: %s", got)
+	}
+}
+
+func TestFileFind_GitRepo_WithRunner(t *testing.T) {
+	dir := setupFileFindRepo(t)
+	runner := gitcmd.New(4)
+	p := NewFileFind(&FileReader{RepoDir: dir, Mode: ModeWorkspace, Runner: runner})
+
+	got, err := p.Execute(context.Background(), map[string]any{"query_name": ".go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "main.go") {
+		t.Errorf("expected main.go via Runner, got: %s", got)
+	}
+}
+
+func TestFileFind_CaseSensitive(t *testing.T) {
+	dir := setupFileFindRepo(t)
+	p := NewFileFind(&FileReader{RepoDir: dir, Mode: ModeWorkspace})
+
+	got, err := p.Execute(context.Background(), map[string]any{
+		"query_name":     "makefile",
+		"case_sensitive": false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "Makefile") {
+		t.Errorf("case-insensitive should find Makefile, got: %s", got)
+	}
+
+	got2, err2 := p.Execute(context.Background(), map[string]any{
+		"query_name":     "makefile",
+		"case_sensitive": true,
+	})
+	if err2 != nil {
+		t.Fatal(err2)
+	}
+	if strings.Contains(got2, "Makefile") {
+		t.Errorf("case-sensitive should not find Makefile when searching 'makefile', got: %s", got2)
+	}
+}
+
+func TestShouldSkipFile(t *testing.T) {
+	tests := []struct {
+		path string
+		want bool
+	}{
+		{"main.go", false},
+		{"pkg/util.go", false},
+		{"README.md", false},
+		{"Makefile", false},
+		{"Dockerfile", false},
+		{"LICENSE", false},
+		{"Vagrantfile", false},
+		{"Containerfile", false},
+		{"some_binary", true},
+		{"dir/unknown_file", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			got := shouldSkipFile(tt.path)
+			if got != tt.want {
+				t.Errorf("shouldSkipFile(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
 	}
 }

@@ -2,12 +2,15 @@ package tool
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/open-code-review/open-code-review/internal/gitcmd"
 )
 
 func TestBuildGrepArgs_WorkspaceMode(t *testing.T) {
@@ -379,4 +382,156 @@ func TestGitGrep_NonGitDirectoryNoMatch(t *testing.T) {
 	if out != "No matches found" {
 		t.Errorf("expected 'No matches found', got: %q", out)
 	}
+}
+
+func TestCodeSearchProvider_Tool(t *testing.T) {
+	p := NewCodeSearch(&FileReader{RepoDir: "/tmp"})
+	if p.Tool() != CodeSearch {
+		t.Errorf("Tool() = %v, want CodeSearch", p.Tool())
+	}
+}
+
+func TestCodeSearchProvider_Execute_BlankSearchText(t *testing.T) {
+	p := NewCodeSearch(&FileReader{RepoDir: "/tmp"})
+	got, err := p.Execute(context.Background(), map[string]any{"search_text": "  "})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "Error: search_text is blank" {
+		t.Errorf("Execute() = %q, want blank error", got)
+	}
+}
+
+func TestCodeSearchProvider_Execute_Found(t *testing.T) {
+	dir := setupTestRepo(t)
+	p := NewCodeSearch(&FileReader{RepoDir: dir, Mode: ModeWorkspace})
+
+	got, err := p.Execute(context.Background(), map[string]any{
+		"search_text": "Hello",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "hello.go") {
+		t.Errorf("expected hello.go in result, got: %s", got)
+	}
+}
+
+func TestCodeSearchProvider_Execute_WithFilePatterns(t *testing.T) {
+	dir := setupTestRepo(t)
+	p := NewCodeSearch(&FileReader{RepoDir: dir, Mode: ModeWorkspace})
+
+	got, err := p.Execute(context.Background(), map[string]any{
+		"search_text":   "Util",
+		"file_patterns": []any{"pkg/"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "util.go") {
+		t.Errorf("expected util.go in result, got: %s", got)
+	}
+}
+
+func TestCodeSearchProvider_Execute_CaseSensitive(t *testing.T) {
+	dir := setupTestRepo(t)
+	p := NewCodeSearch(&FileReader{RepoDir: dir, Mode: ModeWorkspace})
+
+	got, err := p.Execute(context.Background(), map[string]any{
+		"search_text":    "hello",
+		"case_sensitive": true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(got, "Hello") {
+		t.Errorf("case-sensitive search for 'hello' should not match 'Hello', got: %s", got)
+	}
+}
+
+func TestCodeSearchProvider_Execute_PerlRegexp(t *testing.T) {
+	dir := setupTestRepo(t)
+	p := NewCodeSearch(&FileReader{RepoDir: dir, Mode: ModeWorkspace})
+
+	got, err := p.Execute(context.Background(), map[string]any{
+		"search_text":     "Hell\\w+",
+		"use_perl_regexp": true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "hello.go") {
+		t.Errorf("expected hello.go in perl regexp result, got: %s", got)
+	}
+}
+
+func TestGitGrep_WithRunner(t *testing.T) {
+	dir := setupTestRepo(t)
+	runner := gitcmd.New(4)
+	p := NewCodeSearch(&FileReader{RepoDir: dir, Mode: ModeWorkspace, Runner: runner})
+
+	result, err := p.gitGrep(context.Background(), "Hello", false, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, "hello.go") {
+		t.Errorf("expected hello.go in result via Runner, got: %s", result)
+	}
+}
+
+func TestGitGrep_WithRunner_NoMatch(t *testing.T) {
+	dir := setupTestRepo(t)
+	runner := gitcmd.New(4)
+	p := NewCodeSearch(&FileReader{RepoDir: dir, Mode: ModeWorkspace, Runner: runner})
+
+	result, err := p.gitGrep(context.Background(), "nonexistentXYZ", false, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != "No matches found" {
+		t.Errorf("expected 'No matches found', got: %s", result)
+	}
+}
+
+func TestGitGrep_WithRunner_CommitMode(t *testing.T) {
+	dir := setupTestRepo(t)
+	commit := getHeadCommit(t, dir)
+	runner := gitcmd.New(4)
+	p := NewCodeSearch(&FileReader{RepoDir: dir, Ref: commit, Mode: ModeCommit, Runner: runner})
+
+	result, err := p.gitGrep(context.Background(), "Hello", false, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, "hello.go") {
+		t.Errorf("expected hello.go in result via Runner commit mode, got: %s", result)
+	}
+}
+
+func TestGitGrep_Timeout(t *testing.T) {
+	dir := setupTestRepo(t)
+	p := NewCodeSearch(&FileReader{RepoDir: dir, Mode: ModeWorkspace})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	result, err := p.gitGrep(ctx, "Hello", false, false, nil)
+	if err != nil {
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected context.Canceled, got: %v", err)
+		}
+		return
+	}
+	if !strings.Contains(result, "timed out") && !strings.Contains(result, "No matches found") {
+		t.Errorf("expected timeout or no matches message, got: %s", result)
+	}
+}
+
+func TestBuildGrepArgs_NoIndex(t *testing.T) {
+	p := NewCodeSearch(&FileReader{RepoDir: "/tmp", Ref: ""})
+	args := p.buildGrepArgs("foo", false, false, true, nil)
+
+	assertContains(t, args, "--no-index")
+	assertContains(t, args, "--exclude-standard")
+	assertNotContains(t, args, "--untracked")
 }

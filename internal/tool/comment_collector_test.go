@@ -150,3 +150,27 @@ func TestCommentCollector_RemoveByPathAndIndices_NoMatch(t *testing.T) {
 		t.Error("remove from non-matching path should be no-op")
 	}
 }
+
+func TestCommentCollector_ReplaceSince_NegativeSnap(t *testing.T) {
+	c := NewCommentCollector()
+	c.Add(cm("a.go", "keep"))
+	c.ReplaceSince(-1, []model.LlmComment{cm("new.go", "replaced")})
+
+	got := c.Comments()
+	if len(got) != 1 || got[0].Path != "new.go" {
+		t.Errorf("ReplaceSince(-1) should replace all, got %v", got)
+	}
+}
+
+func TestCommentCollector_ReplaceSince_Zero(t *testing.T) {
+	c := NewCommentCollector()
+	c.Add(cm("a.go", "x"))
+	c.Add(cm("b.go", "y"))
+
+	c.ReplaceSince(0, []model.LlmComment{cm("only.go", "z")})
+
+	got := c.Comments()
+	if len(got) != 1 || got[0].Path != "only.go" {
+		t.Errorf("ReplaceSince(0) should replace all, got %v", got)
+	}
+}
