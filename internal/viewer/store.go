@@ -75,19 +75,22 @@ func DiscoverRepos(root string) ([]RepoInfo, error) {
 
 // SessionSummary is built from session_start and session_end records.
 type SessionSummary struct {
-	SessionID     string
-	Timestamp     time.Time
-	CWD           string
-	GitBranch     string
-	Model         string
-	ReviewMode    string
-	DiffFrom      string
-	DiffTo        string
-	DiffCommit    string
-	FilesReviewed []string
-	DurationSec   float64
-	FileCount     int
-	LLMFailures   int
+	SessionID           string
+	Timestamp           time.Time
+	CWD                 string
+	GitBranch           string
+	Model               string
+	ReviewMode          string
+	DiffFrom            string
+	DiffTo              string
+	DiffCommit          string
+	FilesReviewed       []string
+	DurationSec         float64
+	FileCount           int
+	LLMFailures         int
+	ControlPlane        string
+	BundleID            string
+	TokenUsageAvailable bool
 }
 
 // ListSessions returns lightweight summaries for all sessions in a repo subdir.
@@ -126,7 +129,7 @@ func peekSession(path string) (SessionSummary, error) {
 	}
 	defer f.Close()
 
-	var summary SessionSummary
+	summary := SessionSummary{ControlPlane: "ocr-llm", TokenUsageAvailable: true}
 	scanner := bufio.NewScanner(f)
 	buf := make([]byte, 0, 1024*1024)
 	scanner.Buffer(buf, 10*1024*1024)
@@ -165,6 +168,15 @@ func peekSession(path string) (SessionSummary, error) {
 			if v, ok := rec["diffCommit"].(string); ok {
 				summary.DiffCommit = v
 			}
+			if value, ok := rec["controlPlane"].(string); ok {
+				summary.ControlPlane = value
+			}
+			if value, ok := rec["bundleId"].(string); ok {
+				summary.BundleID = value
+			}
+			if value, ok := rec["tokenUsage"].(string); ok && value == "not_available" {
+				summary.TokenUsageAvailable = false
+			}
 		}
 	}
 
@@ -195,9 +207,18 @@ func peekSession(path string) (SessionSummary, error) {
 
 // ViewSession holds fully parsed records for one session.
 type ViewSession struct {
-	Summary    SessionSummary
-	TokenUsage TokenUsageSummary
-	Files      []*FileGroup // ordered by file path
+	Summary     SessionSummary
+	TokenUsage  TokenUsageSummary
+	Files       []*FileGroup // ordered by file path
+	CodexEvents []CodexEvent
+}
+
+// CodexEvent is a read-only viewer representation of one Codex workflow event.
+type CodexEvent struct {
+	Event      string
+	BundleID   string
+	DurationMS int64
+	Error      string
 }
 
 // TokenUsageSummary aggregates token counts across the session.
@@ -268,7 +289,11 @@ func LoadSession(root, encodedRepo, sessionID string) (*ViewSession, error) {
 	}
 	defer f.Close()
 
-	vs := &ViewSession{Files: make([]*FileGroup, 0)}
+	vs := &ViewSession{
+		Summary:     SessionSummary{ControlPlane: "ocr-llm", TokenUsageAvailable: true},
+		Files:       make([]*FileGroup, 0),
+		CodexEvents: make([]CodexEvent, 0),
+	}
 	fileIndex := make(map[string]*FileGroup)
 
 	scanner := bufio.NewScanner(f)
@@ -308,6 +333,27 @@ func LoadSession(root, encodedRepo, sessionID string) (*ViewSession, error) {
 			if v, ok := rec["diffCommit"].(string); ok {
 				vs.Summary.DiffCommit = v
 			}
+			if value, ok := rec["controlPlane"].(string); ok {
+				vs.Summary.ControlPlane = value
+			}
+			if value, ok := rec["bundleId"].(string); ok {
+				vs.Summary.BundleID = value
+			}
+			if value, ok := rec["tokenUsage"].(string); ok && value == "not_available" {
+				vs.Summary.TokenUsageAvailable = false
+			}
+
+		case "codex_event":
+			event, _ := rec["event"].(string)
+			bundleID, _ := rec["bundleId"].(string)
+			errorMessage, _ := rec["error"].(string)
+			duration := int64(0)
+			if value, ok := rec["duration_ms"].(float64); ok {
+				duration = int64(value)
+			}
+			vs.CodexEvents = append(vs.CodexEvents, CodexEvent{
+				Event: event, BundleID: bundleID, DurationMS: duration, Error: errorMessage,
+			})
 
 		case "llm_request":
 			fp, _ := rec["filePath"].(string)

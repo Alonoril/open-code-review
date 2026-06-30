@@ -46,6 +46,8 @@ func dispatch() error {
 		return nil
 	case "review", "r":
 		return runReview(args[1:])
+	case "codex":
+		return runCodex(args[1:])
 	case "scan", "s":
 		return runScan(args[1:])
 	case "config":
@@ -72,6 +74,7 @@ Usage:
 
 Commands:
   review, r    Start a diff-based code review
+  codex        Build deterministic inputs for a Codex-led review
   scan, s      Scan entire files (no diff required)
   rules        Inspect and debug review rules
   config       Manage configuration settings
@@ -82,6 +85,7 @@ Commands:
 Examples:
   ocr review --from master --to dev        Review diff range
   ocr review --commit abc123               Review a single commit
+  ocr codex prepare --from main --to HEAD  Build a Codex review bundle
   ocr scan                                 Scan every reviewable file in the repo
   ocr scan --path internal/agent           Scan a single directory
   ocr config provider                      Interactive provider setup

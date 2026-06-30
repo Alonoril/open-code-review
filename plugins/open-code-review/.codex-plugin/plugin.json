@@ -1,7 +1,7 @@
 {
   "name": "open-code-review",
-  "version": "1.0.0",
-  "description": "Use Alibaba Open Code Review from local Codex.",
+  "version": "2.0.0",
+  "description": "Codex-owned code reviews using OCR deterministic context tooling.",
   "author": {
     "name": "Alibaba"
   },
@@ -17,8 +17,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Open Code Review",
-    "shortDescription": "Run structured code reviews from local Codex.",
-    "longDescription": "Adds a Codex skill that invokes the local Open Code Review CLI to review Git workspace changes, commits, and branch comparisons.",
+    "shortDescription": "Codex-owned reviews with OCR context tooling.",
+    "longDescription": "Codex performs review reasoning while OCR provides deterministic diff, scan, rule, context, validation, report, and session services.",
     "developerName": "Alibaba",
     "category": "Developer Tools",
     "capabilities": [
