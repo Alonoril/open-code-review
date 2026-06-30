@@ -321,13 +321,19 @@ Install and enable `Open Code Review`, then start a new Codex thread and invoke 
 @Open Code Review review and fix high-confidence issues
 ```
 
-This registers a Codex skill that runs the local OCR CLI:
+This registers a Codex-owned review skill. OCR supplies deterministic review
+evidence and target-aware context; Codex performs all planning, reasoning,
+prioritization, reporting, and explicitly requested fixes:
 
 ```bash
-ocr review --audience agent
+ocr codex prepare --format json
+ocr codex validate-comments --bundle /tmp/bundle.json --comments /tmp/comments.json
+ocr codex report --bundle /tmp/bundle.json --comments /tmp/comments.json --format markdown
 ```
 
-This integration does not change OCR's internal LLM backend and does not require configuring an OpenAI Responses API endpoint for Codex. OCR itself still requires the `ocr` CLI to be installed and configured as described in the CLI setup section.
+The Codex-owned path does not initialize OCR's LLM backend and requires no OCR
+provider or API key. Native `ocr review` and `ocr scan` remain available when a
+user explicitly wants OCR's independent external-LLM workflow.
 
 Korean guide: [`plugins/open-code-review/CODEX.ko-KR.md`](plugins/open-code-review/CODEX.ko-KR.md)
 

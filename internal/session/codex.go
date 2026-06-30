@@ -1,0 +1,146 @@
+package session
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sync"
+	"time"
+)
+
+var safeCodexRunID = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+// CodexEvent contains only metrics supplied by the Codex-owned workflow.
+type CodexEvent struct {
+	Files           int      `json:"files,omitempty"`
+	Findings        int      `json:"findings,omitempty"`
+	Warnings        int      `json:"warnings,omitempty"`
+	ContextCalls    int      `json:"context_calls,omitempty"`
+	Partial         bool     `json:"partial,omitempty"`
+	DurationMS      int64    `json:"duration_ms,omitempty"`
+	ValidationValid *bool    `json:"validation_valid,omitempty"`
+	FilesReviewed   []string `json:"files_reviewed,omitempty"`
+	Error           string   `json:"error,omitempty"`
+}
+
+// CodexRecorder appends viewer-compatible Codex-owned events.
+type CodexRecorder struct {
+	mu       sync.Mutex
+	path     string
+	runID    string
+	bundleID string
+	started  time.Time
+}
+
+// OpenCodexRecorder opens or resumes one explicitly requested run ID.
+func OpenCodexRecorder(repoDir, runID, bundleID string) (*CodexRecorder, error) {
+	if runID == "" || !safeCodexRunID.MatchString(runID) {
+		return nil, fmt.Errorf("session ID must contain only letters, digits, dot, underscore, or dash")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("resolve home dir: %w", err)
+	}
+	directory := filepath.Join(home, ".opencodereview", "sessions", encodeRepoPath(repoDir))
+	if err := os.MkdirAll(directory, 0o700); err != nil {
+		return nil, fmt.Errorf("create session directory: %w", err)
+	}
+	path := filepath.Join(directory, runID+".jsonl")
+	recorder := &CodexRecorder{
+		path: path, runID: runID, bundleID: bundleID, started: time.Now(),
+	}
+	info, statErr := os.Stat(path)
+	if statErr == nil && info.Size() > 0 {
+		return recorder, nil
+	}
+	if statErr != nil && !os.IsNotExist(statErr) {
+		return nil, fmt.Errorf("stat session file: %w", statErr)
+	}
+	if err := recorder.write(map[string]any{
+		"uuid":         generateUUID(),
+		"parentUuid":   nil,
+		"type":         "session_start",
+		"sessionId":    runID,
+		"timestamp":    recorder.started.UTC().Format(time.RFC3339),
+		"cwd":          repoDir,
+		"model":        "Codex",
+		"reviewMode":   "codex_owned",
+		"controlPlane": "codex-owned",
+		"bundleId":     bundleID,
+		"tokenUsage":   "not_available",
+	}); err != nil {
+		return nil, err
+	}
+	return recorder, nil
+}
+
+// Path returns the persisted JSONL path.
+func (recorder *CodexRecorder) Path() string {
+	return recorder.path
+}
+
+// Record appends one correlated Codex workflow event.
+func (recorder *CodexRecorder) Record(event string, details CodexEvent) error {
+	record := codexEventRecord(recorder, "codex_event", details)
+	record["event"] = event
+	return recorder.write(record)
+}
+
+// Finalize appends a viewer-compatible session end record.
+func (recorder *CodexRecorder) Finalize(details CodexEvent) error {
+	record := codexEventRecord(recorder, "session_end", details)
+	record["duration_seconds"] = time.Since(recorder.started).Seconds()
+	record["files_reviewed"] = details.FilesReviewed
+	record["llm_failures"] = 0
+	return recorder.write(record)
+}
+
+func codexEventRecord(
+	recorder *CodexRecorder,
+	recordType string,
+	details CodexEvent,
+) map[string]any {
+	content, _ := json.Marshal(details)
+	var fields map[string]any
+	_ = json.Unmarshal(content, &fields)
+	fields["uuid"] = generateUUID()
+	fields["parentUuid"] = nil
+	fields["type"] = recordType
+	fields["sessionId"] = recorder.runID
+	fields["timestamp"] = time.Now().UTC().Format(time.RFC3339)
+	fields["controlPlane"] = "codex-owned"
+	fields["bundleId"] = recorder.bundleID
+	fields["tokenUsage"] = "not_available"
+	return fields
+}
+
+func (recorder *CodexRecorder) write(record map[string]any) error {
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	encoded, err := json.Marshal(record)
+	if err != nil {
+		return fmt.Errorf("marshal Codex session record: %w", err)
+	}
+	file, err := os.OpenFile(
+		recorder.path,
+		os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+		0o600,
+	)
+	if err != nil {
+		return fmt.Errorf("open Codex session: %w", err)
+	}
+	if err := file.Chmod(0o600); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("restrict Codex session: %w", err)
+	}
+	if _, err := file.Write(append(encoded, '\n')); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("write Codex session: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("close Codex session: %w", err)
+	}
+	return nil
+}

@@ -33,15 +33,15 @@ func TestBuildGrepArgs_CommitMode(t *testing.T) {
 	p := NewCodeSearch(&FileReader{RepoDir: "/tmp", Ref: "abc1234"})
 	args := p.buildGrepArgs("myFunc", false, false, false, []string{"pkg/"})
 
-	assertContainsInOrder(t, args, "-e", "myFunc", "--end-of-options", "abc1234", "--", "pkg/")
+	assertContainsInOrder(t, args, "-e", "myFunc", "abc1234", "--", "pkg/")
 	assertNotContains(t, args, "--untracked")
 }
 
-func TestBuildGrepArgs_RefUsesEndOfOptions(t *testing.T) {
-	p := NewCodeSearch(&FileReader{RepoDir: "/tmp", Ref: "-O./pwn.sh"})
+func TestBuildGrepArgs_CommitModeAvoidsUnsupportedEndOfOptions(t *testing.T) {
+	p := NewCodeSearch(&FileReader{RepoDir: "/tmp", Ref: "abc1234"})
 	args := p.buildGrepArgs("myFunc", false, false, false, nil)
 
-	assertContainsInOrder(t, args, "-e", "myFunc", "--end-of-options", "-O./pwn.sh", "--")
+	assertNotContains(t, args, "--end-of-options")
 }
 
 func TestBuildGrepArgs_PatternStartingWithDash(t *testing.T) {
