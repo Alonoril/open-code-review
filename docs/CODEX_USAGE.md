@@ -20,7 +20,7 @@ codex
 如果是远程仓库，也可以替换成对应的仓库地址：
 
 ```bash
-codex plugin marketplace add alibaba/open-code-review
+codex plugin marketplace add Alonoril/open-code-review
 codex
 /plugins
 ```
