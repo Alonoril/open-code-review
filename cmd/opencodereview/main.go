@@ -86,6 +86,7 @@ Examples:
   ocr review --from master --to dev        Review diff range
   ocr review --commit abc123               Review a single commit
   ocr codex prepare --from main --to HEAD  Build a Codex review bundle
+  ocr codex capabilities                   Probe Codex workflow support
   ocr scan                                 Scan every reviewable file in the repo
   ocr scan --path internal/agent           Scan a single directory
   ocr config provider                      Interactive provider setup

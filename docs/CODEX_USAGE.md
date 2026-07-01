@@ -44,6 +44,7 @@ Codex 会自动走新的主导路径：
 2. 再由 Codex 读取 bundle、补充上下文并完成判断。
 3. 需要时再调用 `validate-comments` 和 `report`。
 4. 只有你明确要求修复时，才会修改工作区文件。
+5. 启动前如果要探测本机能力，可以先执行 `ocr codex capabilities --format json`。
 
 ## 3. 在 Codex CLI 里怎么用
 
@@ -58,6 +59,7 @@ Codex CLI 的使用方式和上面一致。核心是先启用插件，再用 `@O
 ```bash
 # 工作区
 ocr codex prepare --format json
+ocr codex capabilities --format json
 
 # 分支 / PR
 ocr codex prepare --from <base> --to <head> --format json

@@ -65,6 +65,8 @@ func runCodexWithWriter(args []string, writer io.Writer) error {
 		return runCodexReport(args[1:], writer)
 	case "context":
 		return runCodexContext(context.Background(), args[1:], writer)
+	case "capabilities":
+		return runCodexCapabilities(args[1:], writer)
 	case "-h", "--help":
 		printCodexUsage(writer)
 		return nil
@@ -450,7 +452,8 @@ Commands:
   prepare             Build a deterministic review bundle without invoking an OCR LLM
   validate-comments   Validate Codex findings against immutable bundle evidence
   report              Render validated Codex findings as Markdown, text, or JSON
-  context             Read target-aware repository context without an LLM`)
+  context             Read target-aware repository context without an LLM
+  capabilities        Report Codex workflow capabilities as JSON or text`)
 }
 
 func printCodexPrepareUsage(writer io.Writer) {

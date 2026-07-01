@@ -152,6 +152,27 @@ func TestCodexUnknownSubcommand(t *testing.T) {
 	}
 }
 
+func TestCodexCapabilitiesEmitsStructuredResult(t *testing.T) {
+	var output bytes.Buffer
+	err := runCodexWithWriter([]string{"capabilities"}, &output)
+	if err != nil {
+		t.Fatalf("runCodexWithWriter() error = %v", err)
+	}
+	var result codexCapabilitiesResult
+	if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+		t.Fatalf("decode capabilities: %v\n%s", err, output.String())
+	}
+	if result.SchemaVersion != codexCapabilitiesSchemaVersion {
+		t.Fatalf("schema version = %q, want %q", result.SchemaVersion, codexCapabilitiesSchemaVersion)
+	}
+	if !result.Prepare || !result.ValidateComments || !result.Report || !result.Context || !result.Scan || !result.Session {
+		t.Fatalf("capabilities = %+v, want all Codex workflows supported", result)
+	}
+	if !result.ReadOnlyFallback {
+		t.Fatalf("capabilities = %+v, want read-only fallback supported", result)
+	}
+}
+
 func TestCodexValidateCommentsEmitsStructuredResult(t *testing.T) {
 	repository := initCodexRepository(t)
 	writeCodexFile(t, repository, "main.go", "package sample\n\nvar changed = true\n")
