@@ -207,8 +207,8 @@ Examples:
   ocr review --format json
   ocr review -f json
 
-  # Agent mode (summary only, no progress lines)
-  ocr review --audience agent
+  # JSON output for machine parsing
+  ocr review --format json
 
   # Preview which files will be reviewed
   ocr review --preview

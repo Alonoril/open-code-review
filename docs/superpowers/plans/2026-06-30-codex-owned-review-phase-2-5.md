@@ -176,7 +176,7 @@ Run `rtk go test ./internal/session ./internal/viewer ./cmd/opencodereview -run 
 - Modify: `plugins/open-code-review/skills/open-code-review/SKILL.md`
 - Modify: `plugins/open-code-review/.codex-plugin/plugin.json`
 - Modify: `README.md`
-- Modify: `plugins/open-code-review/CODEX.ko-KR.md`
+- Modify: `plugins/open-code-review/CODEX.zh-CN.md`
 - Modify: `docs/CODEX_SKILL_FEASIBILITY.md`
 - Create: `docs/CODEX_PARITY_MATRIX.md`
 

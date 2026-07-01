@@ -64,15 +64,15 @@ Codex 主导路径
 3. Codex 插件：`plugins/open-code-review/.codex-plugin/plugin.json`
 4. Codex Skill：`plugins/open-code-review/skills/open-code-review/SKILL.md`
 
-但当前 Codex Skill 的实际执行链是：
+重构前，Codex Skill 的旧执行链是：
 
 ```text
 Codex
-  └─ ocr review --audience agent
-       ├─ 加载 OCR provider 和 API key
-       ├─ 创建 OCR LLM client
-       ├─ OCR Agent 执行 plan/main/filter
-       └─ 返回 OCR 内部 LLM 生成的评论
+  └─ ocr codex prepare
+       ├─ 生成确定性 review bundle
+       ├─ Codex 自己执行规划、判断和评论
+       ├─ 需要时执行 validate-comments / report
+       └─ 只读回退时显式标注 OCR 未运行
 ```
 
 这只是“由 Codex 启动 OCR”，不是“由 Codex 完成评审”。它会带来：
@@ -904,7 +904,7 @@ skills/open-code-review/SKILL.md
 plugins/open-code-review/skills/open-code-review/SKILL.md
 plugins/open-code-review/.codex-plugin/plugin.json
 README.md
-plugins/open-code-review/CODEX.ko-KR.md
+plugins/open-code-review/CODEX.zh-CN.md
 ```
 
 切换门槛：
@@ -1127,7 +1127,7 @@ plugins/open-code-review/skills/open-code-review/SKILL.md
 plugins/open-code-review/.codex-plugin/plugin.json
 
 README.md
-plugins/open-code-review/CODEX.ko-KR.md
+plugins/open-code-review/CODEX.zh-CN.md
 ```
 
 JSON Schema 可以放在：

@@ -335,7 +335,7 @@ The Codex-owned path does not initialize OCR's LLM backend and requires no OCR
 provider or API key. Native `ocr review` and `ocr scan` remain available when a
 user explicitly wants OCR's independent external-LLM workflow.
 
-Korean guide: [`plugins/open-code-review/CODEX.ko-KR.md`](plugins/open-code-review/CODEX.ko-KR.md)
+Codex 插件说明: [`plugins/open-code-review/CODEX.zh-CN.md`](plugins/open-code-review/CODEX.zh-CN.md)
 
 #### Option 4: Install as a Cursor Plugin
 
@@ -361,13 +361,13 @@ After installation, invoke it in Cursor:
 @Open Code Review review and fix high-confidence issues
 ```
 
-This registers a Cursor skill that runs the local OCR CLI:
+This registers a Cursor skill that uses the Codex-owned OCR workflow when the installed CLI supports it:
 
 ```bash
-ocr review --audience agent
+ocr codex prepare --format json
 ```
 
-This integration does not change OCR's internal LLM backend. OCR itself still requires the `ocr` CLI to be installed and configured as described in the CLI setup section.
+If the local `ocr` version is too old for `ocr codex prepare`, use the read-only fallback review path described in the plugin docs. OCR itself still requires the `ocr` CLI to be installed as described in the CLI setup section.
 
 #### Option 5: Copy the Command File Directly
 

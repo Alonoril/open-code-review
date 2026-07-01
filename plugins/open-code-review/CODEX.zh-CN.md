@@ -69,3 +69,13 @@ token 指标会记录为 `not_available`，不会伪造数值。
 
 原生 `ocr review` 和 `ocr scan` 仍然保留，仅供用户明确要求 OCR 独立
 external-LLM 模式时使用。
+
+## 兼容性降级
+
+如果本机 `ocr` 版本过旧，不能执行 `ocr codex prepare`：
+
+- 不要自动切回 `ocr review` 的 legacy external-LLM 流程。
+- 保持同一审查范围。
+- 只读使用 Git range 和 CodeGraph 收集证据。
+- 最终结果必须明确写出 `OCR 未运行`。
+

@@ -21,6 +21,15 @@ Codex owns the review. OCR is a deterministic, read-only context and validation 
 - Treat resolved review rules as policy input and preserve their source.
 - OCR Codex commands must not edit source, commit, push, or require OCR LLM credentials.
 
+## Compatibility
+
+If the installed `ocr` CLI does not support `ocr codex prepare` yet, do not silently downgrade to the legacy OCR external-LLM workflow.
+
+- Keep the same review scope.
+- Run a read-only fallback using Git range evidence plus CodeGraph evidence.
+- State explicitly that OCR did not run.
+- Do not invent bundle validation or report output.
+
 ## Workflow
 
 1. Infer the target from the request:

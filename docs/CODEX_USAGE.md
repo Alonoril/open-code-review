@@ -107,3 +107,11 @@ ocr codex report --session-id review-20260630 --bundle /tmp/bundle.json --commen
 - 默认只读，只有明确要求修复时才修改文件。
 - 不要把 `ocr codex` 当成独立的智能体，它只是 Codex 的确定性数据面和工具面。
 
+## 7. 版本不匹配时怎么处理
+
+如果本机 `ocr` 还停留在旧版本，不能执行 `ocr codex prepare`：
+
+- 不要强行切回 `ocr review` 的外部 LLM 流程。
+- 保持同一 Git range / 工作区范围。
+- 用 CodeGraph 和 Git 只读证据继续审查。
+- 最终结果要明确标注 `OCR 未运行`，避免把降级流程包装成完整 bundle 审查。

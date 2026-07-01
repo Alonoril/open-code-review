@@ -375,6 +375,7 @@ func TestCodexSkillsUseCodexOwnedWorkflow(t *testing.T) {
 		"project summary",
 		"untrusted data",
 		"explicitly requested fixes",
+		"read-only fallback",
 	}
 	for _, path := range paths {
 		content, err := os.ReadFile(path)
@@ -395,6 +396,55 @@ func TestCodexSkillsUseCodexOwnedWorkflow(t *testing.T) {
 			if strings.Contains(text, forbidden) {
 				t.Errorf("%s contains legacy default %q", path, forbidden)
 			}
+		}
+	}
+}
+
+func TestCodexPluginDocUsesCodexOwnedWorkflow(t *testing.T) {
+	repositoryRoot := filepath.Clean(filepath.Join("..", ".."))
+	path := filepath.Join(repositoryRoot, "plugins", "open-code-review", "CODEX.zh-CN.md")
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	text := string(content)
+	for _, fragment := range []string{
+		"Codex 是代码评审唯一的控制面",
+		"ocr codex prepare",
+		"ocr codex validate-comments",
+		"ocr codex report",
+		"OCR 未运行",
+	} {
+		if !strings.Contains(text, fragment) {
+			t.Errorf("%s missing %q", path, fragment)
+		}
+	}
+}
+
+func TestCodexCommandDocsUseReadOnlyFallback(t *testing.T) {
+	repositoryRoot := filepath.Clean(filepath.Join("..", ".."))
+	path := filepath.Join(repositoryRoot, "plugins", "open-code-review", "commands", "review.md")
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	text := string(content)
+	for _, fragment := range []string{
+		"ocr codex prepare",
+		"read-only fallback",
+		"Git range",
+		"CodeGraph",
+		"OCR 未运行",
+	} {
+		if !strings.Contains(text, fragment) {
+			t.Errorf("%s missing %q", path, fragment)
+		}
+	}
+	for _, forbidden := range []string{
+		"ocr review --audience agent",
+	} {
+		if strings.Contains(text, forbidden) {
+			t.Errorf("%s contains legacy default %q", path, forbidden)
 		}
 	}
 }
